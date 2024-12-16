@@ -4,18 +4,17 @@ datas segment
     upper_case db "ABCDEFGHIJKLMNOPQRSTUVWXYZ", 0
     lower_case db "abcdefghijklmnopqrstuvwxyz", 0
     digits db "0123456789", 0
-    special_chars db "#@$%&*()_+[]{}!" ,0
-    ;special_chars db "!@#$%^&*()_+[]{}|:,.<>?/~" ,0
+    special_chars db "!@#$%^&*()_+[]{}|:,.<>?/~" ,0
     valid_upper_length db 26
     valid_lower_length db 26
     valid_digits_length db 10
-    valid_special_length db 15
+    valid_special_length db 25
     constraints dw ""
     isUpper DB 0
     isLower DB 0
     isDigit DB 0
     isSpecial DB 0
-    wrong_pass db 0Dh, 0Ah, "weak password", 0Dh, 0Ah, '$'
+    weak_pass db 0Dh, 0Ah, "weak password", 0Dh, 0Ah, '$'
     wrong_mess db 0Dh, 0Ah,"please check the constraints and renter the password", 0Dh, 0Ah, '$'
     newline db 0Dh, 0Ah, '$'
     strong_Pass db  0Dh, 0Ah,"strong password",  0Dh, 0Ah,'$'
@@ -32,6 +31,7 @@ datas segment
     password_prompt db  0Dh, 0Ah, "Enter your password: $"
     gen_password_msg db "Password generation feature is available.", 0Dh, 0Ah, "$"
 datas ends
+
 codes segment
     main proc far
     assume cs:codes, ds:datas
@@ -94,15 +94,14 @@ generate_password:
     lea dx, gen_password_msg
     mov ah, 09h
     int 21h
-    lea si, array
-    mov cx, 12
+    ;lea si, array
+    ;mov cx, 12
     call generate_strong_password
     jmp menu
 exit_program:
     mov ah, 4Ch
     int 21h
-
-main endp
+    main endp
 check_password proc near
     ; Reset flags before checking password
     mov isUpper, 0
@@ -117,13 +116,18 @@ check_loop:
     mov al, [si]
     cmp al, 0Dh ; Check if we reached the end of input (Enter key)
     je check_done
+    check_invalid:
+    cmp al, 32 ; check if character is space
+    je fail
+    cmp al, 127 ; check if character is(DEL)
+    je fail
+    ; Check if the character is uppercase, lowercase, digit, or special
     cmp al, 'A'
     jl check_lowercase
     cmp al, 'Z'
     jg check_lowercase
     mov isUpper, 1
     jmp next_char
-
 check_lowercase:
     cmp al, 'a'
     jl check_digit
@@ -139,19 +143,22 @@ check_digit:
     jg check_special
     mov isDigit, 1
     jmp next_char
-
 check_special:
-    cmp al, '!'
-    jl next_char
-    cmp al, '/'
-    jg next_char
+    lea di, special_chars 
+check_special_loop:
+    mov bl, [di]         
+    cmp bl, 0           
+    je next_char
+    cmp al, bl
+    je set_special_flag
+    inc di
+    jmp check_special_loop
+set_special_flag:
     mov isSpecial, 1
     jmp next_char
-
 next_char:
     inc si
     loop check_loop
-
 check_done:
     ; Check if all constraints are satisfied
     cmp isUpper, 0
@@ -167,19 +174,16 @@ check_done:
     mov ah, 09h
     int 21h
     ret
-
 fail:
     ; Password is weak
-    lea dx, wrong_pass
+    lea dx, weak_pass
     mov ah, 09h
     int 21h
     lea dx, wrong_mess
     mov ah, 09h
     int 21h
     ret
-
 check_password endp
-
 read_password proc near
     read_char:
         mov ah, 01h
@@ -194,14 +198,12 @@ read_password proc near
         mov [len], cx
         ret
 read_password endp
-
 readinp proc near
     mov ah, 01h
     int 21h
     ret
 readinp endp
-
-generate_strong_password proc    
+generate_strong_password proc
     call random_uppercase
     mov ah, al       
     call display_char
@@ -222,7 +224,7 @@ generate_strong_password proc
     call display_char
     call random_digit
     test al, al     
-    call display_char 
+    call display_char
     call random_uppercase
     mov ah, al       
     call display_char
@@ -246,142 +248,141 @@ generate_strong_password proc
     call display_char
     ret
 generate_strong_password endp
-
-random_uppercase proc   
+random_uppercase proc
      mov ah, 2Ch     
-    int 21h              
+    int 21h          
     mov al, dl       
-    and al, valid_upper_length      
+    and al, valid_upper_length    
      xor ah, ah
-    div valid_upper_length   
+    div valid_upper_length 
     mov bx, 0
     mov bl, ah
     mov al, [upper_case + bx]
     ret
     random_uppercase endp
-    random_lowercase proc  
-    mov ah, 2Ch     
-    int 21h           
+    random_lowercase proc
+     mov ah, 2Ch     
+    int 21h          
     mov al, dl       
-    and al, valid_lower_length        
-    xor ah, ah
-    div valid_lower_length 
+    and al, valid_lower_length      
+     xor ah, ah
+     div valid_lower_length 
     mov bx, 0
-    mov bl, ah  
+    mov bl, ah
     mov al, [lower_case + bx]
     ret
     random_lowercase endp
     random_digit proc
      mov ah, 2Ch     
-    int 21h              
+    int 21h          
     mov al, dl       
-    and al, valid_digits_length         
+    and al, valid_digits_length     
      xor ah, ah
-     div valid_digits_length     
+     div valid_digits_length 
     mov bx, 0
-    mov bl, ah 
+    mov bl, ah
     mov al, [digits + bx]
     ret
-    random_digit endp    
-    random_special proc   
+    random_digit endp
+    random_special proc
      mov ah, 2Ch     
-    int 21h              
+    int 21h          
     mov al, dl       
-    and al, valid_special_length         
-    xor ah, ah
-    div valid_special_length     
+    and al, valid_special_length     
+     xor ah, ah
+     div valid_special_length 
     mov bx, 0
-    mov bl, ah  
+    mov bl, ah
     mov al, [special_chars + bx]
     ret
 random_special endp
-random_uppercase2 proc   
+random_uppercase2 proc
      mov ah, 2Ch     
-    int 21h              
+    int 21h          
     mov al, dh       
-    and al,valid_upper_length         
+    and al,valid_upper_length     
      xor ah, ah
-    div valid_upper_length    
+    div valid_upper_length 
     mov bx, 0
-    mov bl, ah  
+    mov bl, ah
     mov al, [upper_case + bx]
     ret
     random_uppercase2 endp
-    random_lowercase2 proc   
+    random_lowercase2 proc
      mov ah, 2Ch     
-    int 21h             
+    int 21h          
     mov al, dh       
     and al, valid_lower_length      
-		xor ah, ah
-     div valid_lower_length    
+     xor ah, ah
+     div valid_lower_length 
     mov bx, 0
     mov bl, ah
     mov al, [lower_case + bx]
     ret
     random_lowercase2 endp
-    random_digit2 proc   
+    random_digit2 proc
      mov ah, 2Ch     
-    int 21h              
+    int 21h          
     mov al, dh       
-    and al, valid_digits_length    
-     xor ah, ah
-     div valid_digits_length     
-    mov bx, 0
-    mov bl, ah  
-    mov al, [digits + bx]
-    ret
-    random_digit2 endp    
-    random_special2 proc   
-     mov ah, 2Ch     
-    int 21h              
-    mov al, dh       
-    and al, valid_special_length      
-     xor ah, ah
-     div valid_special_length     
-    mov bx, 0
-    mov bl, ah  
-    mov al, [special_chars + bx]
-    ret
-    random_special2 endp
-    random_uppercase3 proc   
-     mov ah, 2Ch     
-    int 21h              
-    mov al, cl       
-    and al, valid_upper_length         
-     xor ah, ah
-    div valid_upper_length     
-    mov bx, 0
-    mov bl, ah  
-    mov al, [upper_case + bx]
-    ret
-    random_uppercase3 endp
-    random_lowercase3 proc   
-     mov ah, 2Ch     
-    int 21h              
-    mov al, cl       
-    and al, valid_lower_length         
-     xor ah, ah
-     div valid_lower_length     
-    mov bx, 0
-    mov bl, ah  
-    mov al, [lower_case + bx]
-    ret
-    random_lowercase3 endp
-    random_digit3 proc   
-     mov ah, 2Ch     
-    int 21h              
-    mov al, cl       
-    and al, valid_digits_length         
+    and al, valid_digits_length
      xor ah, ah
      div valid_digits_length 
     mov bx, 0
-    mov bl, ah  
+    mov bl, ah
     mov al, [digits + bx]
     ret
-    random_digit3 endp    
-    random_special3 proc   
+    random_digit2 endp
+    random_special2 proc
      mov ah, 2Ch     
-    int 21h              
+    int 21h          
+    mov al, dh       
+    and al, valid_special_length      
+     xor ah, ah
+     div valid_special_length 
+    mov bx, 0
+    mov bl, ah
+    mov al, [special_chars + bx]
+    ret
+    random_special2 endp
+    random_uppercase3 proc
+     mov ah, 2Ch     
+    int 21h          
+    mov al, cl       
+    and al, valid_upper_length     
+     xor ah, ah
+    div valid_upper_length
+    mov bx, 0
+    mov bl, ah
+    mov al, [upper_case + bx]
+    ret
+    random_uppercase3 endp
+    random_lowercase3 proc
+     mov ah, 2Ch     
+    int 21h          
+    mov al, cl       
+    and al, valid_lower_length     
+     xor ah, ah
+     div valid_lower_length 
+    mov bx, 0
+    mov bl, ah
+    mov al, [lower_case + bx]
+    ret
+    random_lowercase3 endp
+    random_digit3 proc
+     mov ah, 2Ch     
+    int 21h          
+    mov al, cl       
+    and al, valid_digits_length      
+     xor ah, ah
+     div valid_digits_length 
+    mov bx, 0
+    mov bl, ah
+    mov al, [digits + bx]
+    ret
+    random_digit3 endp
+    random_special3 proc
+     mov ah, 2Ch     
+    int 21h          
     mov al, cl       
     and al, valid_special_length          
      xor ah, ah
@@ -390,12 +391,13 @@ random_uppercase2 proc
     mov bl, ah  
     mov al, [special_chars + bx]
     ret
-    random_special3 endp    
-display_char proc    
+    random_special3 endp  
+display_char proc
     mov dl, al       
     mov ah, 2        
     int 21h
     ret
-display_char end
+display_char endp
+
 codes ends
 end main
